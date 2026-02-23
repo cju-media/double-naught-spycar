@@ -107,12 +107,16 @@
                     canvas.width = window.innerWidth;
                     canvas.height = window.innerHeight;
                     if (loadedImages.length > 0 && gridLayout.length > 0) {
-                        drawLayout();
+                        if (!isAnimating) {
+                            drawLayout();
+                        }
                     }
                 }
 
                 window.addEventListener('resize', resizeCanvas);
                 resizeCanvas();
+
+                let isAnimating = false;
 
                 function preloadImages() {
                     let loadedCount = 0;
@@ -188,7 +192,9 @@
                                 r: r,
                                 c: c,
                                 w: bestW,
-                                h: bestH
+                                h: bestH,
+                                nextImgIndex: -1,
+                                opacity: 1.0 // 1 means full opacity of imgIndex. If transitioning, this will drop to 0, and we crossfade nextImgIndex
                             });
                         }
                     }
@@ -205,14 +211,25 @@
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
                     gridLayout.forEach(item => {
-                        const img = loadedImages[item.imgIndex];
                         const x = item.c * cellW;
                         const y = item.r * cellH;
                         const w = item.w * cellW;
                         const h = item.h * cellH;
 
-                        drawImageInRect(ctx, img, x, y, w, h);
+                        // Draw current image (fading out)
+                        if (item.imgIndex >= 0) {
+                            ctx.globalAlpha = item.opacity;
+                            drawImageInRect(ctx, loadedImages[item.imgIndex], x, y, w, h);
+                        }
+
+                        // Draw next image (fading in)
+                        if (item.nextImgIndex >= 0) {
+                            ctx.globalAlpha = 1.0 - item.opacity;
+                            drawImageInRect(ctx, loadedImages[item.nextImgIndex], x, y, w, h);
+                        }
                     });
+
+                    ctx.globalAlpha = 1.0;
                 }
 
                 function drawImageInRect(ctx, img, x, y, w, h) {
@@ -240,6 +257,32 @@
                     ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, w, h);
                 }
 
+                function animate() {
+                    let stillAnimating = false;
+
+                    gridLayout.forEach(item => {
+                        if (item.nextImgIndex >= 0) {
+                            item.opacity -= 0.02; // Fade speed
+                            if (item.opacity <= 0) {
+                                item.opacity = 1.0;
+                                item.imgIndex = item.nextImgIndex;
+                                item.nextImgIndex = -1;
+                            } else {
+                                stillAnimating = true;
+                            }
+                        }
+                    });
+
+                    drawLayout();
+
+                    if (stillAnimating) {
+                        isAnimating = true;
+                        requestAnimationFrame(animate);
+                    } else {
+                        isAnimating = false;
+                    }
+                }
+
                 function startGrid() {
                     generateLayout();
 
@@ -247,21 +290,21 @@
                     setInterval(() => {
                         let changeCount = 0;
                         gridLayout.forEach(item => {
-                            if (Math.random() < 0.1) {
+                            if (item.nextImgIndex === -1 && Math.random() < 0.1) {
                                 let newIndex;
                                 // Pick a new image that is different from the current one (if possible)
                                 do {
                                     newIndex = Math.floor(Math.random() * loadedImages.length);
                                 } while (loadedImages.length > 1 && newIndex === item.imgIndex);
 
-                                item.imgIndex = newIndex;
+                                item.nextImgIndex = newIndex;
                                 changeCount++;
                             }
                         });
 
-                        if (changeCount > 0) {
-                            console.log(`Grid update: ${changeCount} images changed.`);
-                            drawLayout();
+                        if (changeCount > 0 && !isAnimating) {
+                            console.log(`Grid update: ${changeCount} images changing.`);
+                            animate();
                         }
                     }, 3000);
                 }
