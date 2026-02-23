@@ -478,8 +478,12 @@
                     }
                 };
 
-                window.addEventListener('mousemove', showNavbar);
-                window.addEventListener('touchstart', showNavbar);
+                window.addEventListener('mousemove', (e) => {
+                    if (e.clientY < 60) {
+                        showNavbar();
+                    }
+                });
+                window.addEventListener('touchstart', showNavbar); // Keep touch as global for now, or refine
                 window.addEventListener('touchmove', showNavbar);
 
                 navbar.addEventListener('mouseenter', () => {
