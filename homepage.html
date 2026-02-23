@@ -65,92 +65,124 @@
 
     <div id="audio-controls">
         <span id="play-pause">Play Music</span>
-        <audio id="bg-audio" loop></audio>
+        <audio id="bg-audio"></audio>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const mediaListUrl = 'assets/media_list.json';
-            const slideshowContainer = document.getElementById('slideshow-container');
-            const audioPlayer = document.getElementById('bg-audio');
-            const playPauseBtn = document.getElementById('play-pause');
+        (function() {
+            const init = () => {
+                const REPO_BASE_URL = 'https://raw.githubusercontent.com/cju-media/double-naught-spycar/main/';
+                const mediaListUrl = REPO_BASE_URL + 'assets/media_list.json';
+                const slideshowContainer = document.getElementById('slideshow-container');
+                const audioPlayer = document.getElementById('bg-audio');
+                const playPauseBtn = document.getElementById('play-pause');
 
-            let images = [];
-            let currentSlide = 0;
+                // If elements are missing (e.g., failed injection), exit early to avoid errors
+                if (!slideshowContainer || !audioPlayer || !playPauseBtn) return;
 
-            // Fetch media list
-            fetch(mediaListUrl)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
+                let images = [];
+                let currentSlide = 0;
+                let audioTracks = [];
+                let currentAudioIndex = 0;
+
+                // Fetch media list
+                fetch(mediaListUrl)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.images && data.images.length > 0) {
+                            images = data.images.map(img => REPO_BASE_URL + img);
+                            // Randomize starting slide
+                            currentSlide = Math.floor(Math.random() * images.length);
+                            initSlideshow();
+                        } else {
+                            console.error('No images found in list');
+                            slideshowContainer.innerHTML = '<p style="color:white; text-align:center; padding-top: 20%;">No images available</p>';
+                        }
+
+                        if (data.audio && data.audio.length > 0) {
+                            audioTracks = data.audio.map(track => REPO_BASE_URL + track);
+                            // Randomize starting audio
+                            currentAudioIndex = Math.floor(Math.random() * audioTracks.length);
+                            playTrack(currentAudioIndex);
+                        } else {
+                             console.error('No audio found in list');
+                             playPauseBtn.style.display = 'none';
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error loading media list:', err);
+                        slideshowContainer.innerHTML = '<p style="color:white; text-align:center; padding-top: 20%;">Media list not found. Please run the download script.</p>';
+                    });
+
+                function initSlideshow() {
+                    // Create a div for each image
+                    images.forEach((src, index) => {
+                        const slide = document.createElement('div');
+                        slide.classList.add('slide');
+                        slide.style.backgroundImage = `url('${src}')`;
+                        if (index === currentSlide) slide.classList.add('active');
+                        slideshowContainer.appendChild(slide);
+                    });
+
+                    if (images.length > 1) {
+                        setInterval(nextSlide, 5000); // Change every 5 seconds
                     }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.images && data.images.length > 0) {
-                        images = data.images;
-                        initSlideshow();
-                    } else {
-                        console.error('No images found in list');
-                        slideshowContainer.innerHTML = '<p style="color:white; text-align:center; padding-top: 20%;">No images available</p>';
-                    }
-
-                    if (data.audio && data.audio.length > 0) {
-                        const randomAudio = data.audio[Math.floor(Math.random() * data.audio.length)];
-                        audioPlayer.src = randomAudio;
-                        // Attempt to autoplay (might be blocked by browser)
-                        audioPlayer.play().then(() => {
-                             playPauseBtn.textContent = 'Pause Music';
-                        }).catch(e => {
-                            console.log('Autoplay blocked, user interaction required.');
-                            playPauseBtn.textContent = 'Play Music';
-                        });
-                    } else {
-                         console.error('No audio found in list');
-                         playPauseBtn.style.display = 'none';
-                    }
-                })
-                .catch(err => {
-                    console.error('Error loading media list:', err);
-                    slideshowContainer.innerHTML = '<p style="color:white; text-align:center; padding-top: 20%;">Media list not found. Please run the download script.</p>';
-                });
-
-            function initSlideshow() {
-                // Create a div for each image
-                images.forEach((src, index) => {
-                    const slide = document.createElement('div');
-                    slide.classList.add('slide');
-                    slide.style.backgroundImage = `url('${src}')`;
-                    if (index === 0) slide.classList.add('active');
-                    slideshowContainer.appendChild(slide);
-                });
-
-                if (images.length > 1) {
-                    setInterval(nextSlide, 5000); // Change every 5 seconds
                 }
-            }
 
-            function nextSlide() {
-                const slides = document.querySelectorAll('.slide');
-                if (slides.length === 0) return;
+                function nextSlide() {
+                    const slides = document.querySelectorAll('.slide');
+                    if (slides.length === 0) return;
 
-                slides[currentSlide].classList.remove('active');
-                currentSlide = (currentSlide + 1) % slides.length;
-                slides[currentSlide].classList.add('active');
-            }
-
-            const togglePlay = () => {
-                if (audioPlayer.paused) {
-                    audioPlayer.play();
-                    playPauseBtn.textContent = 'Pause Music';
-                } else {
-                    audioPlayer.pause();
-                    playPauseBtn.textContent = 'Play Music';
+                    slides[currentSlide].classList.remove('active');
+                    currentSlide = (currentSlide + 1) % slides.length;
+                    slides[currentSlide].classList.add('active');
                 }
+
+                function playTrack(index) {
+                    if (audioTracks.length === 0) return;
+                    currentAudioIndex = index;
+                    audioPlayer.src = audioTracks[currentAudioIndex];
+
+                    // Attempt to autoplay (might be blocked by browser)
+                    audioPlayer.play().then(() => {
+                            playPauseBtn.textContent = 'Pause Music';
+                    }).catch(e => {
+                        console.log('Autoplay blocked, user interaction required.');
+                        playPauseBtn.textContent = 'Play Music';
+                    });
+                }
+
+                function nextTrack() {
+                    if (audioTracks.length === 0) return;
+                    currentAudioIndex = (currentAudioIndex + 1) % audioTracks.length;
+                    playTrack(currentAudioIndex);
+                }
+
+                const togglePlay = () => {
+                    if (audioPlayer.paused) {
+                        audioPlayer.play();
+                        playPauseBtn.textContent = 'Pause Music';
+                    } else {
+                        audioPlayer.pause();
+                        playPauseBtn.textContent = 'Play Music';
+                    }
+                };
+
+                document.getElementById('audio-controls').addEventListener('click', togglePlay);
+                audioPlayer.addEventListener('ended', nextTrack);
             };
 
-            document.getElementById('audio-controls').addEventListener('click', togglePlay);
-        });
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+        })();
     </script>
 </body>
 </html>
