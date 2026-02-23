@@ -40,9 +40,62 @@
         #audio-controls:hover {
             background: rgba(0, 0, 0, 0.8);
         }
+
+        #navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px 20px;
+            z-index: 1001;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            box-sizing: border-box;
+        }
+
+        #navbar h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        #navbar ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            gap: 20px;
+        }
+
+        #navbar a {
+            color: white;
+            text-decoration: none;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        #navbar a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
+
+    <nav id="navbar">
+        <h1>Double Naught Spycar</h1>
+        <ul>
+            <li><a href="#">Home</a></li>
+            <li><a href="#">Gallery</a></li>
+            <li><a href="#">About</a></li>
+            <li><a href="#">Contact</a></li>
+        </ul>
+    </nav>
 
     <canvas id="slideshow-canvas"></canvas>
 
@@ -60,9 +113,10 @@
                 const ctx = canvas.getContext('2d');
                 const audioPlayer = document.getElementById('bg-audio');
                 const playPauseBtn = document.getElementById('play-pause');
+                const navbar = document.getElementById('navbar');
 
                 // If elements are missing (e.g., failed injection), exit early to avoid errors
-                if (!canvas || !audioPlayer || !playPauseBtn) return;
+                if (!canvas || !audioPlayer || !playPauseBtn || !navbar) return;
 
                 let images = [];
                 let loadedImages = [];
@@ -405,6 +459,25 @@
 
                 document.getElementById('audio-controls').addEventListener('click', togglePlay);
                 audioPlayer.addEventListener('ended', nextTrack);
+
+                // Navbar Reveal Logic
+                let navTimeout;
+
+                const showNavbar = () => {
+                    navbar.style.opacity = '1';
+
+                    if (navTimeout) {
+                        clearTimeout(navTimeout);
+                    }
+
+                    navTimeout = setTimeout(() => {
+                        navbar.style.opacity = '0';
+                    }, 3000); // Hide after 3 seconds of inactivity
+                };
+
+                window.addEventListener('mousemove', showNavbar);
+                window.addEventListener('touchstart', showNavbar);
+                window.addEventListener('touchmove', showNavbar);
             };
 
             if (document.readyState === 'loading') {
