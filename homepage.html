@@ -250,10 +250,12 @@
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
                     gridLayout.forEach(item => {
-                        const x = item.c * cellW;
-                        const y = item.r * cellH;
-                        const w = item.w * cellW;
-                        const h = item.h * cellH;
+                        // Calculate positions with slight overlap or rounding to prevent gaps
+                        const x = Math.floor(item.c * cellW);
+                        const y = Math.floor(item.r * cellH);
+                        // Ensure width/height reaches the next grid line exactly
+                        const w = Math.ceil((item.c + item.w) * cellW) - x;
+                        const h = Math.ceil((item.r + item.h) * cellH) - y;
 
                         // Draw current item (fading out)
                         if (item.imgIndex !== -1) {
