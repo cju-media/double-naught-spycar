@@ -69,8 +69,18 @@
                 let audioTracks = [];
                 let currentAudioIndex = 0;
 
-                const GRID_SIZE = 8;
+                let GRID_SIZE = 8;
                 let gridLayout = [];
+
+                function getGridSizeForWidth(width) {
+                    if (width < 600) {
+                        return 4;
+                    } else {
+                        return 8;
+                    }
+                }
+
+                GRID_SIZE = getGridSizeForWidth(window.innerWidth);
 
                 // Fetch media list
                 fetch(mediaListUrl)
@@ -105,17 +115,30 @@
                     });
 
                 function resizeCanvas() {
+                    const newGridSize = getGridSizeForWidth(window.innerWidth);
+                    let needsLayout = false;
+
+                    if (newGridSize !== GRID_SIZE) {
+                        GRID_SIZE = newGridSize;
+                        needsLayout = true;
+                    }
+
                     canvas.width = window.innerWidth;
                     canvas.height = window.innerHeight;
-                    if (loadedImages.length > 0 && gridLayout.length > 0) {
-                        if (!isAnimating) {
+
+                    if (loadedImages.length > 0) {
+                        if (needsLayout) {
+                            generateLayout();
+                        } else if (gridLayout.length > 0 && !isAnimating) {
                             drawLayout();
                         }
                     }
                 }
 
                 window.addEventListener('resize', resizeCanvas);
-                resizeCanvas();
+                // Initial set up
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
 
                 let isAnimating = false;
 
