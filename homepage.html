@@ -218,8 +218,13 @@
                                 }
                             }
 
-                            // Pick random image
-                            const imgIndex = Math.floor(Math.random() * loadedImages.length);
+                            // Pick random image or gray block (25% chance)
+                            let imgIndex;
+                            if (Math.random() < 0.25) {
+                                imgIndex = -2; // -2 represents a gray block
+                            } else {
+                                imgIndex = Math.floor(Math.random() * loadedImages.length);
+                            }
 
                             gridLayout.push({
                                 imgIndex: imgIndex,
@@ -250,20 +255,33 @@
                         const w = item.w * cellW;
                         const h = item.h * cellH;
 
-                        // Draw current image (fading out)
-                        if (item.imgIndex >= 0) {
+                        // Draw current item (fading out)
+                        if (item.imgIndex !== -1) {
                             ctx.globalAlpha = item.opacity;
-                            drawImageInRect(ctx, loadedImages[item.imgIndex], x, y, w, h);
+                            if (item.imgIndex === -2) {
+                                drawGrayRect(ctx, x, y, w, h);
+                            } else if (item.imgIndex >= 0) {
+                                drawImageInRect(ctx, loadedImages[item.imgIndex], x, y, w, h);
+                            }
                         }
 
-                        // Draw next image (fading in)
-                        if (item.nextImgIndex >= 0) {
+                        // Draw next item (fading in)
+                        if (item.nextImgIndex !== -1) {
                             ctx.globalAlpha = 1.0 - item.opacity;
-                            drawImageInRect(ctx, loadedImages[item.nextImgIndex], x, y, w, h);
+                            if (item.nextImgIndex === -2) {
+                                drawGrayRect(ctx, x, y, w, h);
+                            } else if (item.nextImgIndex >= 0) {
+                                drawImageInRect(ctx, loadedImages[item.nextImgIndex], x, y, w, h);
+                            }
                         }
                     });
 
                     ctx.globalAlpha = 1.0;
+                }
+
+                function drawGrayRect(ctx, x, y, w, h) {
+                    ctx.fillStyle = '#808080';
+                    ctx.fillRect(x, y, w, h);
                 }
 
                 function drawImageInRect(ctx, img, x, y, w, h) {
@@ -295,7 +313,7 @@
                     let stillAnimating = false;
 
                     gridLayout.forEach(item => {
-                        if (item.nextImgIndex >= 0) {
+                        if (item.nextImgIndex !== -1) {
                             item.opacity -= 0.02; // Fade speed
                             if (item.opacity <= 0) {
                                 item.opacity = 1.0;
@@ -326,13 +344,23 @@
                         gridLayout.forEach(item => {
                             if (item.nextImgIndex === -1 && Math.random() < 0.1) {
                                 let newIndex;
-                                // Pick a new image that is different from the current one (if possible)
-                                do {
-                                    newIndex = Math.floor(Math.random() * loadedImages.length);
-                                } while (loadedImages.length > 1 && newIndex === item.imgIndex);
+                                // Decide if new item is gray or image (25% chance gray)
+                                if (Math.random() < 0.25) {
+                                    newIndex = -2;
+                                } else {
+                                    // Pick a new image that is different from the current one (if possible)
+                                    // If current is gray (-2), any image is different.
+                                    // If current is image, pick distinct image.
+                                    do {
+                                        newIndex = Math.floor(Math.random() * loadedImages.length);
+                                    } while (loadedImages.length > 1 && newIndex === item.imgIndex);
+                                }
 
-                                item.nextImgIndex = newIndex;
-                                changeCount++;
+                                // Only update if actually different (e.g. gray to gray doesn't need anim, though random chance makes it rare)
+                                if (newIndex !== item.imgIndex) {
+                                    item.nextImgIndex = newIndex;
+                                    changeCount++;
+                                }
                             }
                         });
 
