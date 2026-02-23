@@ -65,7 +65,7 @@
 
     <div id="audio-controls">
         <span id="play-pause">Play Music</span>
-        <audio id="bg-audio" loop></audio>
+        <audio id="bg-audio"></audio>
     </div>
 
     <script>
@@ -78,6 +78,8 @@
 
             let images = [];
             let currentSlide = 0;
+            let audioTracks = [];
+            let currentAudioIndex = 0;
 
             // Fetch media list
             fetch(mediaListUrl)
@@ -90,6 +92,8 @@
                 .then(data => {
                     if (data.images && data.images.length > 0) {
                         images = data.images.map(img => REPO_BASE_URL + img);
+                        // Randomize starting slide
+                        currentSlide = Math.floor(Math.random() * images.length);
                         initSlideshow();
                     } else {
                         console.error('No images found in list');
@@ -97,15 +101,10 @@
                     }
 
                     if (data.audio && data.audio.length > 0) {
-                        const randomAudio = data.audio[Math.floor(Math.random() * data.audio.length)];
-                        audioPlayer.src = REPO_BASE_URL + randomAudio;
-                        // Attempt to autoplay (might be blocked by browser)
-                        audioPlayer.play().then(() => {
-                             playPauseBtn.textContent = 'Pause Music';
-                        }).catch(e => {
-                            console.log('Autoplay blocked, user interaction required.');
-                            playPauseBtn.textContent = 'Play Music';
-                        });
+                        audioTracks = data.audio.map(track => REPO_BASE_URL + track);
+                        // Randomize starting audio
+                        currentAudioIndex = Math.floor(Math.random() * audioTracks.length);
+                        playTrack(currentAudioIndex);
                     } else {
                          console.error('No audio found in list');
                          playPauseBtn.style.display = 'none';
@@ -122,7 +121,7 @@
                     const slide = document.createElement('div');
                     slide.classList.add('slide');
                     slide.style.backgroundImage = `url('${src}')`;
-                    if (index === 0) slide.classList.add('active');
+                    if (index === currentSlide) slide.classList.add('active');
                     slideshowContainer.appendChild(slide);
                 });
 
@@ -140,6 +139,26 @@
                 slides[currentSlide].classList.add('active');
             }
 
+            function playTrack(index) {
+                if (audioTracks.length === 0) return;
+                currentAudioIndex = index;
+                audioPlayer.src = audioTracks[currentAudioIndex];
+
+                // Attempt to autoplay (might be blocked by browser)
+                audioPlayer.play().then(() => {
+                        playPauseBtn.textContent = 'Pause Music';
+                }).catch(e => {
+                    console.log('Autoplay blocked, user interaction required.');
+                    playPauseBtn.textContent = 'Play Music';
+                });
+            }
+
+            function nextTrack() {
+                if (audioTracks.length === 0) return;
+                currentAudioIndex = (currentAudioIndex + 1) % audioTracks.length;
+                playTrack(currentAudioIndex);
+            }
+
             const togglePlay = () => {
                 if (audioPlayer.paused) {
                     audioPlayer.play();
@@ -151,6 +170,7 @@
             };
 
             document.getElementById('audio-controls').addEventListener('click', togglePlay);
+            audioPlayer.addEventListener('ended', nextTrack);
         });
     </script>
 </body>
