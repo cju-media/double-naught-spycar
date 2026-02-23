@@ -462,6 +462,7 @@
 
                 // Navbar Reveal Logic
                 let navTimeout;
+                let isHoveringNavbar = false;
 
                 const showNavbar = () => {
                     navbar.style.opacity = '1';
@@ -470,14 +471,29 @@
                         clearTimeout(navTimeout);
                     }
 
-                    navTimeout = setTimeout(() => {
-                        navbar.style.opacity = '0';
-                    }, 3000); // Hide after 3 seconds of inactivity
+                    if (!isHoveringNavbar) {
+                        navTimeout = setTimeout(() => {
+                            navbar.style.opacity = '0';
+                        }, 3000); // Hide after 3 seconds of inactivity
+                    }
                 };
 
                 window.addEventListener('mousemove', showNavbar);
                 window.addEventListener('touchstart', showNavbar);
                 window.addEventListener('touchmove', showNavbar);
+
+                navbar.addEventListener('mouseenter', () => {
+                    isHoveringNavbar = true;
+                    if (navTimeout) {
+                        clearTimeout(navTimeout);
+                    }
+                    navbar.style.opacity = '1';
+                });
+
+                navbar.addEventListener('mouseleave', () => {
+                    isHoveringNavbar = false;
+                    showNavbar(); // Restart timeout logic
+                });
             };
 
             if (document.readyState === 'loading') {
