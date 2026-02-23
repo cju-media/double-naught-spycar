@@ -245,15 +245,22 @@
 
                     // 10% chance for an image to change randomly every 3 seconds
                     setInterval(() => {
-                        let changed = false;
+                        let changeCount = 0;
                         gridLayout.forEach(item => {
                             if (Math.random() < 0.1) {
-                                item.imgIndex = Math.floor(Math.random() * loadedImages.length);
-                                changed = true;
+                                let newIndex;
+                                // Pick a new image that is different from the current one (if possible)
+                                do {
+                                    newIndex = Math.floor(Math.random() * loadedImages.length);
+                                } while (loadedImages.length > 1 && newIndex === item.imgIndex);
+
+                                item.imgIndex = newIndex;
+                                changeCount++;
                             }
                         });
 
-                        if (changed) {
+                        if (changeCount > 0) {
+                            console.log(`Grid update: ${changeCount} images changed.`);
                             drawLayout();
                         }
                     }, 3000);
