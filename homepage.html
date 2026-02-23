@@ -15,11 +15,11 @@
         }
 
         #slideshow-container {
-            position: absolute;
+            position: relative;
             top: 0;
             left: 0;
             width: 100%;
-            height: 100%;
+            min-height: 100vh;
             z-index: 1;
         }
 
@@ -86,25 +86,19 @@
                 let currentAudioIndex = 0;
 
                 // Fetch media list
-                console.log('Fetching media list from:', mediaListUrl);
                 fetch(mediaListUrl)
                     .then(response => {
-                        console.log('Media list response status:', response.status);
                         if (!response.ok) {
                             throw new Error('Network response was not ok: ' + response.statusText);
                         }
                         return response.json();
                     })
                     .then(data => {
-                        console.log('Media list data received:', data);
                         if (data.images && data.images.length > 0) {
                             // Encode URI components to handle spaces in filenames
                             images = data.images.map(img => REPO_BASE_URL + encodeURI(img));
-                            console.log('Processed images URLs:', images);
-
                             // Randomize starting slide
                             currentSlide = Math.floor(Math.random() * images.length);
-                            console.log('Starting with slide index:', currentSlide);
                             initSlideshow();
                         } else {
                             console.error('No images found in list');
@@ -128,26 +122,16 @@
                     });
 
                 function initSlideshow() {
-                    console.log('Initializing slideshow...');
-                    console.log('Slideshow container dimensions:', slideshowContainer.getBoundingClientRect());
-
                     // Create a div for each image
                     images.forEach((src, index) => {
                         const slide = document.createElement('div');
                         slide.classList.add('slide');
                         slide.style.backgroundImage = `url('${src}')`;
-                        if (index === currentSlide) {
-                            slide.classList.add('active');
-                            console.log('Setting active slide:', index);
-                        }
-                        console.log(`Created slide ${index} with background: url('${src}')`);
+                        if (index === currentSlide) slide.classList.add('active');
                         slideshowContainer.appendChild(slide);
                     });
 
-                    console.log('Total slides appended:', slideshowContainer.children.length);
-
                     if (images.length > 1) {
-                        console.log('Starting slideshow interval (5000ms)');
                         setInterval(nextSlide, 5000); // Change every 5 seconds
                     }
                 }
