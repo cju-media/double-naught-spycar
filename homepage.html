@@ -149,7 +149,7 @@
                     if (audioTracks.length === 0) return;
                     currentAudioIndex = index;
                     audioPlayer.src = audioTracks[currentAudioIndex];
-
+                    
                     // Attempt to autoplay (might be blocked by browser)
                     audioPlayer.play().then(() => {
                             playPauseBtn.textContent = 'Pause Music';
