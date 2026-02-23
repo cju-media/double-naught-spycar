@@ -14,29 +14,13 @@
             font-family: sans-serif;
         }
 
-        #slideshow-container {
-            position: relative;
+        #slideshow-canvas {
+            position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            min-height: 100vh;
-            z-index: 1;
-        }
-
-        .slide {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-size: cover;
-            background-position: center;
-            opacity: 0;
-            transition: opacity 1s ease-in-out;
-        }
-
-        .slide.active {
-            opacity: 1;
+            width: 100vw;
+            height: 100vh;
+            z-index: 999;
         }
 
         #audio-controls {
@@ -59,9 +43,7 @@
 </head>
 <body>
 
-    <div id="slideshow-container">
-        <!-- Slides will be injected here -->
-    </div>
+    <canvas id="slideshow-canvas"></canvas>
 
     <div id="audio-controls">
         <span id="play-pause">Play Music</span>
@@ -73,15 +55,20 @@
             const init = () => {
                 const REPO_BASE_URL = 'https://raw.githubusercontent.com/cju-media/double-naught-spycar/main/';
                 const mediaListUrl = REPO_BASE_URL + 'assets/media_list.json';
-                const slideshowContainer = document.getElementById('slideshow-container');
+                const canvas = document.getElementById('slideshow-canvas');
+                const ctx = canvas.getContext('2d');
                 const audioPlayer = document.getElementById('bg-audio');
                 const playPauseBtn = document.getElementById('play-pause');
 
                 // If elements are missing (e.g., failed injection), exit early to avoid errors
-                if (!slideshowContainer || !audioPlayer || !playPauseBtn) return;
+                if (!canvas || !audioPlayer || !playPauseBtn) return;
 
                 let images = [];
+                let loadedImages = [];
                 let currentSlide = 0;
+                let nextSlideIndex = 0;
+                let opacity = 0;
+                let transitionActive = false;
                 let audioTracks = [];
                 let currentAudioIndex = 0;
 
@@ -99,10 +86,9 @@
                             images = data.images.map(img => REPO_BASE_URL + encodeURI(img));
                             // Randomize starting slide
                             currentSlide = Math.floor(Math.random() * images.length);
-                            initSlideshow();
+                            preloadImages();
                         } else {
                             console.error('No images found in list');
-                            slideshowContainer.innerHTML = '<p style="color:white; text-align:center; padding-top: 20%;">No images available</p>';
                         }
 
                         if (data.audio && data.audio.length > 0) {
@@ -118,31 +104,96 @@
                     })
                     .catch(err => {
                         console.error('Error loading media list:', err);
-                        slideshowContainer.innerHTML = '<p style="color:white; text-align:center; padding-top: 20%;">Media list not found. Please run the download script.</p>';
                     });
 
-                function initSlideshow() {
-                    // Create a div for each image
-                    images.forEach((src, index) => {
-                        const slide = document.createElement('div');
-                        slide.classList.add('slide');
-                        slide.style.backgroundImage = `url('${src}')`;
-                        if (index === currentSlide) slide.classList.add('active');
-                        slideshowContainer.appendChild(slide);
-                    });
-
-                    if (images.length > 1) {
-                        setInterval(nextSlide, 5000); // Change every 5 seconds
+                function resizeCanvas() {
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
+                    if (loadedImages.length > 0) {
+                        drawImageCover(ctx, loadedImages[currentSlide]);
                     }
                 }
 
-                function nextSlide() {
-                    const slides = document.querySelectorAll('.slide');
-                    if (slides.length === 0) return;
+                window.addEventListener('resize', resizeCanvas);
+                resizeCanvas();
 
-                    slides[currentSlide].classList.remove('active');
-                    currentSlide = (currentSlide + 1) % slides.length;
-                    slides[currentSlide].classList.add('active');
+                function preloadImages() {
+                    let loadedCount = 0;
+                    images.forEach((src, index) => {
+                        const img = new Image();
+                        img.src = src;
+                        img.onload = () => {
+                            loadedImages[index] = img;
+                            loadedCount++;
+                            if (loadedCount === images.length) {
+                                startSlideshow();
+                            }
+                        };
+                        // Handle partial loading if some fail? For now assume all load or basic fallback
+                    });
+                }
+
+                function drawImageCover(ctx, img, globalAlpha = 1.0) {
+                    if (!img) return;
+                    ctx.globalAlpha = globalAlpha;
+
+                    // Calculate aspect ratio to cover
+                    const imgRatio = img.width / img.height;
+                    const canvasRatio = canvas.width / canvas.height;
+                    let renderWidth, renderHeight, offsetX, offsetY;
+
+                    if (canvasRatio > imgRatio) {
+                        renderWidth = canvas.width;
+                        renderHeight = canvas.width / imgRatio;
+                        offsetX = 0;
+                        offsetY = (canvas.height - renderHeight) / 2;
+                    } else {
+                        renderWidth = canvas.height * imgRatio;
+                        renderHeight = canvas.height;
+                        offsetX = (canvas.width - renderWidth) / 2;
+                        offsetY = 0;
+                    }
+
+                    ctx.drawImage(img, offsetX, offsetY, renderWidth, renderHeight);
+                }
+
+                function startSlideshow() {
+                    // Initial draw
+                    drawImageCover(ctx, loadedImages[currentSlide]);
+
+                    if (images.length > 1) {
+                        setInterval(() => {
+                            nextSlideIndex = (currentSlide + 1) % loadedImages.length;
+                            transitionActive = true;
+                            opacity = 0;
+                            requestAnimationFrame(animateTransition);
+                        }, 5000);
+                    }
+                }
+
+                function animateTransition() {
+                    if (!transitionActive) return;
+
+                    opacity += 0.02; // Adjust speed here
+                    if (opacity >= 1) {
+                        opacity = 1;
+                        transitionActive = false;
+                        currentSlide = nextSlideIndex;
+                    }
+
+                    // Clear and draw current slide
+                    ctx.globalAlpha = 1.0;
+                    ctx.clearRect(0,0, canvas.width, canvas.height);
+
+                    // Draw outgoing slide
+                    drawImageCover(ctx, loadedImages[currentSlide]);
+
+                    // Draw incoming slide on top with opacity
+                    drawImageCover(ctx, loadedImages[nextSlideIndex], opacity);
+
+                    if (transitionActive) {
+                        requestAnimationFrame(animateTransition);
+                    }
                 }
 
                 function playTrack(index) {
