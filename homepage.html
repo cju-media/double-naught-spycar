@@ -74,9 +74,17 @@
 
                 function getGridSizeForWidth(width) {
                     if (width < 600) {
-                        return 4;
+                        return 5;
                     } else {
                         return 8;
+                    }
+                }
+
+                function getMaxImageSizeForGrid(gridSize) {
+                    if (gridSize === 5) {
+                        return 2;
+                    } else {
+                        return 4;
                     }
                 }
 
@@ -166,14 +174,16 @@
                         grid[r] = new Array(GRID_SIZE).fill(false);
                     }
 
+                    const maxImgSize = getMaxImageSizeForGrid(GRID_SIZE);
+
                     // Loop through each cell
                     for (let r = 0; r < GRID_SIZE; r++) {
                         for (let c = 0; c < GRID_SIZE; c++) {
                             if (grid[r][c]) continue; // Already occupied
 
                             // Determine random size
-                            let targetW = Math.floor(Math.random() * 4) + 1; // 1 to 4
-                            let targetH = Math.floor(Math.random() * 4) + 1; // 1 to 4
+                            let targetW = Math.floor(Math.random() * maxImgSize) + 1; // 1 to maxImgSize
+                            let targetH = Math.floor(Math.random() * maxImgSize) + 1; // 1 to maxImgSize
 
                             // Check if targetW/targetH fits at (r,c)
                             let fits = true;
