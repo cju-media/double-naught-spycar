@@ -65,12 +65,11 @@
 
                 let images = [];
                 let loadedImages = [];
-                let currentSlide = 0;
-                let nextSlideIndex = 0;
-                let opacity = 0;
-                let transitionActive = false;
                 let audioTracks = [];
                 let currentAudioIndex = 0;
+
+                const GRID_SIZE = 8;
+                let gridLayout = [];
 
                 // Fetch media list
                 fetch(mediaListUrl)
@@ -84,8 +83,6 @@
                         if (data.images && data.images.length > 0) {
                             // Encode URI components to handle spaces in filenames
                             images = data.images.map(img => REPO_BASE_URL + encodeURI(img));
-                            // Randomize starting slide
-                            currentSlide = Math.floor(Math.random() * images.length);
                             preloadImages();
                         } else {
                             console.error('No images found in list');
@@ -109,8 +106,8 @@
                 function resizeCanvas() {
                     canvas.width = window.innerWidth;
                     canvas.height = window.innerHeight;
-                    if (loadedImages.length > 0) {
-                        drawImageCover(ctx, loadedImages[currentSlide]);
+                    if (loadedImages.length > 0 && gridLayout.length > 0) {
+                        drawLayout();
                     }
                 }
 
@@ -126,74 +123,125 @@
                             loadedImages[index] = img;
                             loadedCount++;
                             if (loadedCount === images.length) {
-                                startSlideshow();
+                                startGrid();
                             }
                         };
                         // Handle partial loading if some fail? For now assume all load or basic fallback
                     });
                 }
 
-                function drawImageCover(ctx, img, globalAlpha = 1.0) {
+                function generateLayout() {
+                    gridLayout = [];
+                    // Initialize grid
+                    let grid = [];
+                    for (let r = 0; r < GRID_SIZE; r++) {
+                        grid[r] = new Array(GRID_SIZE).fill(false);
+                    }
+
+                    // Loop through each cell
+                    for (let r = 0; r < GRID_SIZE; r++) {
+                        for (let c = 0; c < GRID_SIZE; c++) {
+                            if (grid[r][c]) continue; // Already occupied
+
+                            // Determine random size
+                            let targetW = Math.floor(Math.random() * 4) + 1; // 1 to 4
+                            let targetH = Math.floor(Math.random() * 4) + 1; // 1 to 4
+
+                            // Check if targetW/targetH fits at (r,c)
+                            let fits = true;
+                            if (r + targetH > GRID_SIZE || c + targetW > GRID_SIZE) {
+                                fits = false;
+                            } else {
+                                for (let i = 0; i < targetH; i++) {
+                                    for (let j = 0; j < targetW; j++) {
+                                        if (grid[r + i][c + j]) {
+                                            fits = false;
+                                            break;
+                                        }
+                                    }
+                                    if (!fits) break;
+                                }
+                            }
+
+                            let bestW, bestH;
+                            if (fits) {
+                                bestW = targetW;
+                                bestH = targetH;
+                            } else {
+                                // Fallback to 1x1. Always fits because grid[r][c] is false.
+                                bestW = 1;
+                                bestH = 1;
+                            }
+
+                            // Mark grid
+                            for (let i = 0; i < bestH; i++) {
+                                for (let j = 0; j < bestW; j++) {
+                                    grid[r + i][c + j] = true;
+                                }
+                            }
+
+                            // Pick random image
+                            const imgIndex = Math.floor(Math.random() * loadedImages.length);
+
+                            gridLayout.push({
+                                imgIndex: imgIndex,
+                                r: r,
+                                c: c,
+                                w: bestW,
+                                h: bestH
+                            });
+                        }
+                    }
+
+                    drawLayout();
+                }
+
+                function drawLayout() {
+                    if (!loadedImages.length) return;
+
+                    const cellW = canvas.width / GRID_SIZE;
+                    const cellH = canvas.height / GRID_SIZE;
+
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    gridLayout.forEach(item => {
+                        const img = loadedImages[item.imgIndex];
+                        const x = item.c * cellW;
+                        const y = item.r * cellH;
+                        const w = item.w * cellW;
+                        const h = item.h * cellH;
+
+                        drawImageInRect(ctx, img, x, y, w, h);
+                    });
+                }
+
+                function drawImageInRect(ctx, img, x, y, w, h) {
                     if (!img) return;
-                    ctx.globalAlpha = globalAlpha;
 
-                    // Calculate aspect ratio to cover
                     const imgRatio = img.width / img.height;
-                    const canvasRatio = canvas.width / canvas.height;
-                    let renderWidth, renderHeight, offsetX, offsetY;
+                    const rectRatio = w / h;
 
-                    if (canvasRatio > imgRatio) {
-                        renderWidth = canvas.width;
-                        renderHeight = canvas.width / imgRatio;
-                        offsetX = 0;
-                        offsetY = (canvas.height - renderHeight) / 2;
+                    let sx, sy, sWidth, sHeight;
+
+                    if (rectRatio > imgRatio) {
+                        // Rect is wider than image (relative to aspect), so crop top/bottom
+                        sWidth = img.width;
+                        sHeight = img.width / rectRatio;
+                        sx = 0;
+                        sy = (img.height - sHeight) / 2;
                     } else {
-                        renderWidth = canvas.height * imgRatio;
-                        renderHeight = canvas.height;
-                        offsetX = (canvas.width - renderWidth) / 2;
-                        offsetY = 0;
+                        // Rect is taller, crop sides
+                        sHeight = img.height;
+                        sWidth = img.height * rectRatio;
+                        sy = 0;
+                        sx = (img.width - sWidth) / 2;
                     }
 
-                    ctx.drawImage(img, offsetX, offsetY, renderWidth, renderHeight);
+                    ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, w, h);
                 }
 
-                function startSlideshow() {
-                    // Initial draw
-                    drawImageCover(ctx, loadedImages[currentSlide]);
-
-                    if (images.length > 1) {
-                        setInterval(() => {
-                            nextSlideIndex = (currentSlide + 1) % loadedImages.length;
-                            transitionActive = true;
-                            opacity = 0;
-                            requestAnimationFrame(animateTransition);
-                        }, 5000);
-                    }
-                }
-
-                function animateTransition() {
-                    if (!transitionActive) return;
-
-                    opacity += 0.02; // Adjust speed here
-                    if (opacity >= 1) {
-                        opacity = 1;
-                        transitionActive = false;
-                        currentSlide = nextSlideIndex;
-                    }
-
-                    // Clear and draw current slide
-                    ctx.globalAlpha = 1.0;
-                    ctx.clearRect(0,0, canvas.width, canvas.height);
-
-                    // Draw outgoing slide
-                    drawImageCover(ctx, loadedImages[currentSlide]);
-
-                    // Draw incoming slide on top with opacity
-                    drawImageCover(ctx, loadedImages[nextSlideIndex], opacity);
-
-                    if (transitionActive) {
-                        requestAnimationFrame(animateTransition);
-                    }
+                function startGrid() {
+                    generateLayout();
                 }
 
                 function playTrack(index) {
