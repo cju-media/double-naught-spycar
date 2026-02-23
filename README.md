@@ -18,7 +18,15 @@ The assets are downloaded and stored in the repository using a GitHub Actions wo
     }
     ```
 
-2.  **Install Dependencies (Local):**
+2.  **Enable GitHub Pages:**
+    - Go to your repository **Settings**.
+    - Click on **Pages** in the left sidebar.
+    - Under **Build and deployment**, select **Source** as "Deploy from a branch".
+    - Select the branch (usually `main`) and folder `/ (root)`.
+    - Click **Save**.
+    - Your site will be published at `https://<username>.github.io/<repository-name>/`.
+
+3.  **Install Dependencies (Local):**
     If you want to run the download script locally, you need Python and the required libraries.
     ```bash
     pip install -r requirements.txt
@@ -52,9 +60,21 @@ You can also run the download script on your local machine to test configuration
 
 The script will download files into `assets/audio` and `assets/images` and update `assets/media_list.json`. Open `homepage.html` in your browser to see the changes.
 
+## Embedding in Squarespace or WordPress
+
+To display this homepage on your Squarespace or WordPress site, you can use the provided `embed_loader.html` snippet.
+
+1.  Ensure GitHub Pages is enabled (see Setup).
+2.  Open `embed_loader.html`.
+3.  Replace `YOUR_GITHUB_PAGES_URL` with the full URL to your `homepage.html` (e.g., `https://username.github.io/repo/homepage.html`).
+4.  Copy the code inside the file.
+5.  In Squarespace or WordPress, add a **Code Block** or **Custom HTML** widget.
+6.  Paste the code snippet.
+
 ## Project Structure
 
 - `homepage.html`: The main HTML file for the site.
+- `embed_loader.html`: HTML snippet for embedding the homepage via iframe.
 - `config.json`: Configuration file for Google Drive folder URLs.
 - `scripts/download_assets.py`: Python script to download assets using `gdown`.
 - `.github/workflows/update_assets.yml`: GitHub Actions workflow for automated updates.
