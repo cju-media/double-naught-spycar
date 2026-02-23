@@ -242,6 +242,21 @@
 
                 function startGrid() {
                     generateLayout();
+
+                    // 10% chance for an image to change randomly every 3 seconds
+                    setInterval(() => {
+                        let changed = false;
+                        gridLayout.forEach(item => {
+                            if (Math.random() < 0.1) {
+                                item.imgIndex = Math.floor(Math.random() * loadedImages.length);
+                                changed = true;
+                            }
+                        });
+
+                        if (changed) {
+                            drawLayout();
+                        }
+                    }, 3000);
                 }
 
                 function playTrack(index) {
