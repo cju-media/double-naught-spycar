@@ -123,26 +123,9 @@
                 let audioTracks = [];
                 let currentAudioIndex = 0;
 
-                let GRID_SIZE = 8;
-                let gridLayout = [];
-
-                function getGridSizeForWidth(width) {
-                    if (width < 600) {
-                        return 5;
-                    } else {
-                        return 8;
-                    }
-                }
-
-                function getMaxImageSizeForGrid(gridSize) {
-                    if (gridSize === 5) {
-                        return 2;
-                    } else {
-                        return 4;
-                    }
-                }
-
-                GRID_SIZE = getGridSizeForWidth(window.innerWidth);
+                let currentImgIndex = -1;
+                let nextImgIndex = -1;
+                let opacity = 1.0;
 
                 // Fetch media list
                 fetch(mediaListUrl)
@@ -177,23 +160,11 @@
                     });
 
                 function resizeCanvas() {
-                    const newGridSize = getGridSizeForWidth(window.innerWidth);
-                    let needsLayout = false;
-
-                    if (newGridSize !== GRID_SIZE) {
-                        GRID_SIZE = newGridSize;
-                        needsLayout = true;
-                    }
-
                     canvas.width = window.innerWidth;
                     canvas.height = window.innerHeight;
 
-                    if (loadedImages.length > 0) {
-                        if (needsLayout) {
-                            generateLayout();
-                        } else if (gridLayout.length > 0 && !isAnimating) {
-                            drawLayout();
-                        }
+                    if (loadedImages.length > 0 && !isAnimating) {
+                        drawLayout();
                     }
                 }
 
@@ -213,131 +184,38 @@
                             loadedImages[index] = img;
                             loadedCount++;
                             if (loadedCount === images.length) {
-                                startGrid();
+                                startSlideshow();
                             }
                         };
                         // Handle partial loading if some fail? For now assume all load or basic fallback
                     });
                 }
 
-                function generateLayout() {
-                    gridLayout = [];
-                    // Initialize grid
-                    let grid = [];
-                    for (let r = 0; r < GRID_SIZE; r++) {
-                        grid[r] = new Array(GRID_SIZE).fill(false);
-                    }
-
-                    const maxImgSize = getMaxImageSizeForGrid(GRID_SIZE);
-
-                    // Loop through each cell
-                    for (let r = 0; r < GRID_SIZE; r++) {
-                        for (let c = 0; c < GRID_SIZE; c++) {
-                            if (grid[r][c]) continue; // Already occupied
-
-                            // Determine random size
-                            let targetW = Math.floor(Math.random() * maxImgSize) + 1; // 1 to maxImgSize
-                            let targetH = Math.floor(Math.random() * maxImgSize) + 1; // 1 to maxImgSize
-
-                            // Check if targetW/targetH fits at (r,c)
-                            let fits = true;
-                            if (r + targetH > GRID_SIZE || c + targetW > GRID_SIZE) {
-                                fits = false;
-                            } else {
-                                for (let i = 0; i < targetH; i++) {
-                                    for (let j = 0; j < targetW; j++) {
-                                        if (grid[r + i][c + j]) {
-                                            fits = false;
-                                            break;
-                                        }
-                                    }
-                                    if (!fits) break;
-                                }
-                            }
-
-                            let bestW, bestH;
-                            if (fits) {
-                                bestW = targetW;
-                                bestH = targetH;
-                            } else {
-                                // Fallback to 1x1. Always fits because grid[r][c] is false.
-                                bestW = 1;
-                                bestH = 1;
-                            }
-
-                            // Mark grid
-                            for (let i = 0; i < bestH; i++) {
-                                for (let j = 0; j < bestW; j++) {
-                                    grid[r + i][c + j] = true;
-                                }
-                            }
-
-                            // Pick random image or gray block (25% chance)
-                            let imgIndex;
-                            if (Math.random() < 0.25) {
-                                imgIndex = -2; // -2 represents a gray block
-                            } else {
-                                imgIndex = Math.floor(Math.random() * loadedImages.length);
-                            }
-
-                            gridLayout.push({
-                                imgIndex: imgIndex,
-                                r: r,
-                                c: c,
-                                w: bestW,
-                                h: bestH,
-                                nextImgIndex: -1,
-                                opacity: 1.0 // 1 means full opacity of imgIndex. If transitioning, this will drop to 0, and we crossfade nextImgIndex
-                            });
-                        }
-                    }
-
-                    drawLayout();
-                }
-
                 function drawLayout() {
                     if (!loadedImages.length) return;
 
-                    const cellW = canvas.width / GRID_SIZE;
-                    const cellH = canvas.height / GRID_SIZE;
+                    // Fill background with gray
+                    ctx.fillStyle = '#808080';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    const targetW = canvas.width * 0.75;
+                    const targetH = canvas.height * 0.75;
+                    const x = (canvas.width - targetW) / 2;
+                    const y = (canvas.height - targetH) / 2;
 
-                    gridLayout.forEach(item => {
-                        // Calculate positions with slight overlap or rounding to prevent gaps
-                        const x = Math.floor(item.c * cellW);
-                        const y = Math.floor(item.r * cellH);
-                        // Ensure width/height reaches the next grid line exactly
-                        const w = Math.ceil((item.c + item.w) * cellW) - x;
-                        const h = Math.ceil((item.r + item.h) * cellH) - y;
+                    // Draw current item (fading out)
+                    if (currentImgIndex !== -1) {
+                        ctx.globalAlpha = opacity;
+                        drawImageInRect(ctx, loadedImages[currentImgIndex], x, y, targetW, targetH);
+                    }
 
-                        // Draw current item (fading out)
-                        if (item.imgIndex !== -1) {
-                            ctx.globalAlpha = item.opacity;
-                            if (item.imgIndex === -2) {
-                                drawGrayRect(ctx, x, y, w, h);
-                            } else if (item.imgIndex >= 0) {
-                                drawImageInRect(ctx, loadedImages[item.imgIndex], x, y, w, h);
-                            }
-                        }
-
-                        // Draw next item (fading in)
-                        if (item.nextImgIndex !== -1) {
-                            ctx.globalAlpha = 1.0 - item.opacity;
-                            if (item.nextImgIndex === -2) {
-                                drawGrayRect(ctx, x, y, w, h);
-                            } else if (item.nextImgIndex >= 0) {
-                                drawImageInRect(ctx, loadedImages[item.nextImgIndex], x, y, w, h);
-                            }
-                        }
-                    });
+                    // Draw next item (fading in)
+                    if (nextImgIndex !== -1) {
+                        ctx.globalAlpha = 1.0 - opacity;
+                        drawImageInRect(ctx, loadedImages[nextImgIndex], x, y, targetW, targetH);
+                    }
 
                     ctx.globalAlpha = 1.0;
-                }
-
-                function drawGrayRect(ctx, x, y, w, h) {
-                    ctx.fillStyle = '#808080';
-                    ctx.fillRect(x, y, w, h);
                 }
 
                 function drawImageInRect(ctx, img, x, y, w, h) {
@@ -368,18 +246,16 @@
                 function animate() {
                     let stillAnimating = false;
 
-                    gridLayout.forEach(item => {
-                        if (item.nextImgIndex !== -1) {
-                            item.opacity -= 0.02; // Fade speed
-                            if (item.opacity <= 0) {
-                                item.opacity = 1.0;
-                                item.imgIndex = item.nextImgIndex;
-                                item.nextImgIndex = -1;
-                            } else {
-                                stillAnimating = true;
-                            }
+                    if (nextImgIndex !== -1) {
+                        opacity -= 0.02; // Fade speed
+                        if (opacity <= 0) {
+                            opacity = 1.0;
+                            currentImgIndex = nextImgIndex;
+                            nextImgIndex = -1;
+                        } else {
+                            stillAnimating = true;
                         }
-                    });
+                    }
 
                     drawLayout();
 
@@ -391,40 +267,25 @@
                     }
                 }
 
-                function startGrid() {
-                    generateLayout();
+                function startSlideshow() {
+                    if (loadedImages.length > 0) {
+                        currentImgIndex = Math.floor(Math.random() * loadedImages.length);
+                        drawLayout();
 
-                    // 10% chance for an image to change randomly every 3 seconds
-                    setInterval(() => {
-                        let changeCount = 0;
-                        gridLayout.forEach(item => {
-                            if (item.nextImgIndex === -1 && Math.random() < 0.1) {
+                        setInterval(() => {
+                            if (loadedImages.length > 1 && nextImgIndex === -1) {
                                 let newIndex;
-                                // Decide if new item is gray or image (25% chance gray)
-                                if (Math.random() < 0.25) {
-                                    newIndex = -2;
-                                } else {
-                                    // Pick a new image that is different from the current one (if possible)
-                                    // If current is gray (-2), any image is different.
-                                    // If current is image, pick distinct image.
-                                    do {
-                                        newIndex = Math.floor(Math.random() * loadedImages.length);
-                                    } while (loadedImages.length > 1 && newIndex === item.imgIndex);
-                                }
+                                do {
+                                    newIndex = Math.floor(Math.random() * loadedImages.length);
+                                } while (newIndex === currentImgIndex);
 
-                                // Only update if actually different (e.g. gray to gray doesn't need anim, though random chance makes it rare)
-                                if (newIndex !== item.imgIndex) {
-                                    item.nextImgIndex = newIndex;
-                                    changeCount++;
+                                nextImgIndex = newIndex;
+                                if (!isAnimating) {
+                                    animate();
                                 }
                             }
-                        });
-
-                        if (changeCount > 0 && !isAnimating) {
-                            console.log(`Grid update: ${changeCount} images changing.`);
-                            animate();
-                        }
-                    }, 3000);
+                        }, 3000);
+                    }
                 }
 
                 function playTrack(index) {
