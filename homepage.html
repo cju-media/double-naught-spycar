@@ -21,17 +21,18 @@
             width: 100vw;
             height: 100vh;
             z-index: 999;
+            background-color: #000;
         }
 
         #audio-controls {
-            position: absolute;
+            position: fixed;
             bottom: 20px;
             right: 20px;
             background: rgba(0, 0, 0, 0.5);
             padding: 10px;
             border-radius: 5px;
             color: white;
-            z-index: 100;
+            z-index: 1000;
             cursor: pointer;
             user-select: none;
         }
@@ -39,9 +40,63 @@
         #audio-controls:hover {
             background: rgba(0, 0, 0, 0.8);
         }
+
+        #navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px 20px;
+            z-index: 1001;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            box-sizing: border-box;
+        }
+
+        #navbar h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: white;
+        }
+
+        #navbar ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            gap: 20px;
+        }
+
+        #navbar a {
+            color: white;
+            text-decoration: none;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        #navbar a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
+
+    <nav id="navbar">
+        <h1>Double Naught Spycar</h1>
+        <ul>
+            <li><a href="#">Home</a></li>
+            <li><a href="#">Gallery</a></li>
+            <li><a href="#">About</a></li>
+            <li><a href="#">Contact</a></li>
+        </ul>
+    </nav>
 
     <canvas id="slideshow-canvas"></canvas>
 
@@ -59,18 +114,19 @@
                 const ctx = canvas.getContext('2d');
                 const audioPlayer = document.getElementById('bg-audio');
                 const playPauseBtn = document.getElementById('play-pause');
+                const navbar = document.getElementById('navbar');
 
                 // If elements are missing (e.g., failed injection), exit early to avoid errors
-                if (!canvas || !audioPlayer || !playPauseBtn) return;
+                if (!canvas || !audioPlayer || !playPauseBtn || !navbar) return;
 
                 let images = [];
                 let loadedImages = [];
-                let currentSlide = 0;
-                let nextSlideIndex = 0;
-                let opacity = 0;
-                let transitionActive = false;
                 let audioTracks = [];
                 let currentAudioIndex = 0;
+
+                let currentImgIndex = -1;
+                let nextImgIndex = -1;
+                let opacity = 1.0;
 
                 // Fetch media list
                 fetch(mediaListUrl)
@@ -84,8 +140,6 @@
                         if (data.images && data.images.length > 0) {
                             // Encode URI components to handle spaces in filenames
                             images = data.images.map(img => REPO_BASE_URL + encodeURI(img));
-                            // Randomize starting slide
-                            currentSlide = Math.floor(Math.random() * images.length);
                             preloadImages();
                         } else {
                             console.error('No images found in list');
@@ -109,13 +163,18 @@
                 function resizeCanvas() {
                     canvas.width = window.innerWidth;
                     canvas.height = window.innerHeight;
-                    if (loadedImages.length > 0) {
-                        drawImageCover(ctx, loadedImages[currentSlide]);
+
+                    if (loadedImages.length > 0 && !isAnimating) {
+                        drawLayout();
                     }
                 }
 
                 window.addEventListener('resize', resizeCanvas);
-                resizeCanvas();
+                // Initial set up
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+
+                let isAnimating = false;
 
                 function preloadImages() {
                     let loadedCount = 0;
@@ -133,66 +192,100 @@
                     });
                 }
 
-                function drawImageCover(ctx, img, globalAlpha = 1.0) {
-                    if (!img) return;
-                    ctx.globalAlpha = globalAlpha;
+                function drawLayout() {
+                    if (!loadedImages.length) return;
 
-                    // Calculate aspect ratio to cover
-                    const imgRatio = img.width / img.height;
-                    const canvasRatio = canvas.width / canvas.height;
-                    let renderWidth, renderHeight, offsetX, offsetY;
+                    // Fill background with gray
+                    ctx.fillStyle = '#808080';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                    if (canvasRatio > imgRatio) {
-                        renderWidth = canvas.width;
-                        renderHeight = canvas.width / imgRatio;
-                        offsetX = 0;
-                        offsetY = (canvas.height - renderHeight) / 2;
-                    } else {
-                        renderWidth = canvas.height * imgRatio;
-                        renderHeight = canvas.height;
-                        offsetX = (canvas.width - renderWidth) / 2;
-                        offsetY = 0;
+                    const targetW = canvas.width * 0.75;
+                    const targetH = canvas.height * 0.75;
+                    const x = (canvas.width - targetW) / 2;
+                    const y = (canvas.height - targetH) / 2;
+
+                    // Draw current item (fading out)
+                    if (currentImgIndex !== -1) {
+                        ctx.globalAlpha = opacity;
+                        drawImageInRect(ctx, loadedImages[currentImgIndex], x, y, targetW, targetH);
                     }
 
-                    ctx.drawImage(img, offsetX, offsetY, renderWidth, renderHeight);
+                    // Draw next item (fading in)
+                    if (nextImgIndex !== -1) {
+                        ctx.globalAlpha = 1.0 - opacity;
+                        drawImageInRect(ctx, loadedImages[nextImgIndex], x, y, targetW, targetH);
+                    }
+
+                    ctx.globalAlpha = 1.0;
+                }
+
+                function drawImageInRect(ctx, img, x, y, w, h) {
+                    if (!img) return;
+
+                    const imgRatio = img.width / img.height;
+                    const rectRatio = w / h;
+
+                    let sx, sy, sWidth, sHeight;
+
+                    if (rectRatio > imgRatio) {
+                        // Rect is wider than image (relative to aspect), so crop top/bottom
+                        sWidth = img.width;
+                        sHeight = img.width / rectRatio;
+                        sx = 0;
+                        sy = (img.height - sHeight) / 2;
+                    } else {
+                        // Rect is taller, crop sides
+                        sHeight = img.height;
+                        sWidth = img.height * rectRatio;
+                        sy = 0;
+                        sx = (img.width - sWidth) / 2;
+                    }
+
+                    ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, w, h);
+                }
+
+                function animate() {
+                    let stillAnimating = false;
+
+                    if (nextImgIndex !== -1) {
+                        opacity -= 0.02; // Fade speed
+                        if (opacity <= 0) {
+                            opacity = 1.0;
+                            currentImgIndex = nextImgIndex;
+                            nextImgIndex = -1;
+                        } else {
+                            stillAnimating = true;
+                        }
+                    }
+
+                    drawLayout();
+
+                    if (stillAnimating) {
+                        isAnimating = true;
+                        requestAnimationFrame(animate);
+                    } else {
+                        isAnimating = false;
+                    }
                 }
 
                 function startSlideshow() {
-                    // Initial draw
-                    drawImageCover(ctx, loadedImages[currentSlide]);
+                    if (loadedImages.length > 0) {
+                        currentImgIndex = Math.floor(Math.random() * loadedImages.length);
+                        drawLayout();
 
-                    if (images.length > 1) {
                         setInterval(() => {
-                            nextSlideIndex = (currentSlide + 1) % loadedImages.length;
-                            transitionActive = true;
-                            opacity = 0;
-                            requestAnimationFrame(animateTransition);
+                            if (loadedImages.length > 1 && nextImgIndex === -1) {
+                                let newIndex;
+                                do {
+                                    newIndex = Math.floor(Math.random() * loadedImages.length);
+                                } while (newIndex === currentImgIndex);
+
+                                nextImgIndex = newIndex;
+                                if (!isAnimating) {
+                                    animate();
+                                }
+                            }
                         }, 5000);
-                    }
-                }
-
-                function animateTransition() {
-                    if (!transitionActive) return;
-
-                    opacity += 0.02; // Adjust speed here
-                    if (opacity >= 1) {
-                        opacity = 1;
-                        transitionActive = false;
-                        currentSlide = nextSlideIndex;
-                    }
-
-                    // Clear and draw current slide
-                    ctx.globalAlpha = 1.0;
-                    ctx.clearRect(0,0, canvas.width, canvas.height);
-
-                    // Draw outgoing slide
-                    drawImageCover(ctx, loadedImages[currentSlide]);
-
-                    // Draw incoming slide on top with opacity
-                    drawImageCover(ctx, loadedImages[nextSlideIndex], opacity);
-
-                    if (transitionActive) {
-                        requestAnimationFrame(animateTransition);
                     }
                 }
 
@@ -228,6 +321,41 @@
 
                 document.getElementById('audio-controls').addEventListener('click', togglePlay);
                 audioPlayer.addEventListener('ended', nextTrack);
+
+                // Navbar Reveal Logic
+                let navTimeout;
+                let isHoveringNavbar = false;
+
+                const showNavbar = () => {
+                    navbar.style.opacity = '1';
+
+                    if (navTimeout) {
+                        clearTimeout(navTimeout);
+                    }
+
+                    if (!isHoveringNavbar) {
+                        navTimeout = setTimeout(() => {
+                            navbar.style.opacity = '0';
+                        }, 3000); // Hide after 3 seconds of inactivity
+                    }
+                };
+
+                window.addEventListener('mousemove', showNavbar);
+                window.addEventListener('touchstart', showNavbar);
+                window.addEventListener('touchmove', showNavbar);
+
+                navbar.addEventListener('mouseenter', () => {
+                    isHoveringNavbar = true;
+                    if (navTimeout) {
+                        clearTimeout(navTimeout);
+                    }
+                    navbar.style.opacity = '1';
+                });
+
+                navbar.addEventListener('mouseleave', () => {
+                    isHoveringNavbar = false;
+                    showNavbar(); // Restart timeout logic
+                });
             };
 
             if (document.readyState === 'loading') {
